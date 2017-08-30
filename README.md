@@ -1,10 +1,9 @@
-# FDTD法で一次元問題を解いてみる
+# FDTD法で二次元問題を解いてみる
 
 ## Abstract
-* 文献[1]を参考に実装. うまいこと動きつつ原理も理解できたので次は二次元に挑戦.
-* 以下は誘電体に電磁波が突っ込む様子をgif化. いい具合に透過と反射してるのが見られる.
+* 一次元の続き. 文献[1]を参考に実装.  
 
-<img src="gnuplot_src/fdtd_1.gif" width="500" height="400" alt="GIFアニメーションです" border="0" align="center" hspace="10" vspace="10">
+<img src="gnuplot_src/fdtd_2.gif" width="500" height="400" alt="GIFアニメーションです" border="0" align="center" hspace="10" vspace="10">
 
 ## References
 * TDTD法の参考書  
