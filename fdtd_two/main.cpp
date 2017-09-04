@@ -15,7 +15,7 @@ const int nx0 = 120; //! 解析領域x軸の分割数
 const int ny0 = 120; //! 解析領域y軸の分割数
 const double dx = 0.005; //! x軸セルサイズ
 const double dy = 0.005; //! y軸セルサイズ
-const int nstep = 2000; //! 計算のステップ数
+const int nstep = 700; //! 計算のステップ数
 const int lpml = 8; //! PMLの総数
 const int order = 4; //! PMLの次数
 const double rmax = -120; //! PMLの要求精度dB
@@ -93,7 +93,6 @@ void e_cal(void);
 void h_cal(void);
 
 void feed(void);
-void epsmu(void);
 
 void initpml(void);
 void init_pml(pml p,int x0, int x1, int y0, int y1);
@@ -146,17 +145,6 @@ void feed(void) {
 	ez[ifed][jfed] = ez[ifed][jfed] - befed*iz / (dx*dy);
 }
 
-void epsmu(void) {
-	for (int j = jc-ly2; j <= jc+ly2-1; j++) {
-		for (int i = ic-lx2; i <= ic+lx2-1; i++) {
-			epsd[i][j] = epsr;
-			mud[i][j] = 1.0;
-			sgmed[i][j] = 0.0;
-			sgmmd[i][j] = 0.0;
-		}
-	}
-}
-
 void setup(void) {
 
 	double epsx, epsy, epsz;
@@ -166,19 +154,27 @@ void setup(void) {
 	double a;
 
 	//! 背景媒質設定
-	for (int j = 0; j <= ny+1; j++) {
-		for (int i = 0; i <= nx + 1; i++) {
+	for (int j = 0; j <= ny; j++) {
+		for (int i = 0; i <= nx; i++) {
 			epsd[i][j] = epsbk;
 			mud[i][j] = mubk;
 			sgmed[i][j] = sigebk;
 			sgmmd[i][j] = sigmbk;
 		}
 	}
+
 	//! 誘電体設定
-	epsmu();
+	for (int j = jc - ly2; j <= jc + ly2 - 1; j++) {
+		for (int i = ic - lx2; i <= ic + lx2 - 1; i++) {
+			epsd[i][j] = epsr;
+			mud[i][j] = 1.0;
+			sgmed[i][j] = 0.0;
+			sgmmd[i][j] = 0.0;
+		}
+	}
 
 	//! 電流源の係数決定
-	befed = dt / (0.25*(epsd[ifed][jfed]+ epsd[ifed-1][jfed]+ epsd[ifed][jfed-1]+ epsd[ifed-1][jfed-1]));
+	befed = dt / (eps0*0.25*(epsd[ifed][jfed]+ epsd[ifed-1][jfed]+ epsd[ifed][jfed-1]+ epsd[ifed-1][jfed-1]));
 
 	//! 係数配列の決定
 	for (int j = 0; j <= ny; j++) {
@@ -304,8 +300,8 @@ void init_pml(pml p, int x0, int x1, int y0, int y1){
 	mupml = mubk * mu0;
 	epspml = epsbk * eps0;
 
-	for (int i = 0; i <= x1 - x0; i++) {
-		for (int j = 0; j <= y1 - y0; j++) {
+	for (int i = x0; i <= x1; i++) {
+		for (int j = y0; j <= y1; j++) {
 			if (i < lpml) {
 				sigmxm = pow((((double)(lpml - i) - 0.5) / (double)(lpml)), order)*smax0x;
 				sigmxe = pow(((double)(lpml - i) / (double)(lpml)), order)*smax0x;
@@ -334,23 +330,23 @@ void init_pml(pml p, int x0, int x1, int y0, int y1){
 
 			sigmxe = sigmxe*epsbk;
 			a = 0.5*sigmxe*dt / epspml;
-			p.aexpml[i][j] = (1.0 - a) / (1.0 + a);
-			p.bexpml[i][j] = dt/epspml/(1.0+a)/dx;
+			p.aexpml[i - x0][j - y0] = (1.0 - a) / (1.0 + a);
+			p.bexpml[i - x0][j - y0] = dt/epspml/(1.0+a)/dx;
 
 			sigmye = sigmye*epsbk;
 			a = 0.5*sigmye*dt / epspml;
-			p.aeypml[i][j] = (1.0 - a) / (1.0 + a);
-			p.beypml[i][j] = dt / epspml / (1.0 + a) / dy;
+			p.aeypml[i - x0][j - y0] = (1.0 - a) / (1.0 + a);
+			p.beypml[i - x0][j - y0] = dt / epspml / (1.0 + a) / dy;
 
 			sigmxm = sigmxm*epsbk;
 			a = 0.5*sigmxm*dt / epspml;
-			p.amxpml[i][j] = (1.0 - a) / (1.0 + a);
-			p.bmxpml[i][j] = dt / mupml / (1.0 + a) / dx;
+			p.amxpml[i - x0][j - y0] = (1.0 - a) / (1.0 + a);
+			p.bmxpml[i - x0][j - y0] = dt / mupml / (1.0 + a) / dx;
 
 			sigmym = sigmym*epsbk;
 			a = 0.5*sigmym*dt / epspml;
-			p.amypml[i][j] = (1.0 - a) / (1.0 + a);
-			p.bmypml[i][j] = dt / mupml / (1.0 + a) / dy;
+			p.amypml[i - x0][j - y0] = (1.0 - a) / (1.0 + a);
+			p.bmypml[i - x0][j - y0] = dt / mupml / (1.0 + a) / dy;
 		}
 	}
 
@@ -368,25 +364,25 @@ void e_pml(pml p) {
 	//! Ex
 	for (int j = p.j0 + 1; j <= p.j1 - 1; j++) {
 		for (int i = p.i0 + 1; i <= p.i1 - 1; i++) {
-			p.expml[i][j] = p.aeypml[i][j] * p.expml[i][j] + p.beypml[i][j] * (hz[i][j] - hz[i][j-1]);
-			ex[i][j] = p.expml[i][j];
+			p.expml[i - p.i0][j - p.j0] = p.aeypml[i - p.i0][j - p.j0] * p.expml[i - p.i0][j - p.j0] + p.beypml[i - p.i0][j - p.j0] * (hz[i][j] - hz[i][j-1]);
+			ex[i][j] = p.expml[i - p.i0][j - p.j0];
 		}
 	}
 
 	//! Ey
 	for (int j = p.j0; j <= p.j1 - 1; j++) {
 		for (int i = p.i0 + 1; i <= p.i1 - 1; i++) {
-			p.eypml[i][j] = p.aexpml[i][j] * p.eypml[i][j] - p.bexpml[i][j] * (hz[i][j] - hz[i - 1][j]);
-			ey[i][j] = p.eypml[i][j];
+			p.eypml[i - p.i0][j - p.j0] = p.aexpml[i - p.i0][j - p.j0] * p.eypml[i - p.i0][j - p.j0] - p.bexpml[i - p.i0][j - p.j0] * (hz[i][j] - hz[i - 1][j]);
+			ey[i][j] = p.eypml[i - p.i0][j - p.j0];
 		}
 	}
 
 	//! Ez
 	for (int j = p.j0 + 1; j <= p.j1 - 1; j++) {
 		for (int i = p.i0 + 1; i <= p.i1 - 1; i++) {
-			p.ezx[i][j] = p.aexpml[i][j] * p.ezx[i][j] + p.bexpml[i][j] * (hy[i][j] - hy[i - 1][j]);
-			p.ezy[i][j] = p.aeypml[i][j] * p.ezy[i][j] - p.beypml[i][j] * (hx[i][j] - hx[i][j - 1]);
-			ez[i][j] = p.ezx[i][j] + p.ezy[i][j];
+			p.ezx[i - p.i0][j - p.j0] = p.aexpml[i - p.i0][j - p.j0] * p.ezx[i - p.i0][j - p.j0] + p.bexpml[i - p.i0][j - p.j0] * (hy[i][j] - hy[i - 1][j]);
+			p.ezy[i - p.i0][j - p.j0] = p.aeypml[i - p.i0][j - p.j0] * p.ezy[i - p.i0][j - p.j0] - p.beypml[i - p.i0][j - p.j0] * (hx[i][j] - hx[i][j - 1]);
+			ez[i][j] = p.ezx[i - p.i0][j - p.j0] + p.ezy[i - p.i0][j - p.j0];
 		}
 	}
 
@@ -404,25 +400,25 @@ void h_pml(pml p) {
 	//! Hx
 	for (int j = p.j0; j <= p.j1 - 1; j++) {
 		for (int i = p.i0 + 1; i <= p.i1 - 1; i++) {
-			p.hxpml[i][j] = p.amypml[i][j] * p.hxpml[i][j] - p.bmypml[i][j] * (ez[i][j+1] - ez[i][j]);
-			hx[i][j] = p.hxpml[i][j];
+			p.hxpml[i - p.i0][j - p.j0] = p.amypml[i - p.i0][j - p.j0] * p.hxpml[i - p.i0][j - p.j0] - p.bmypml[i - p.i0][j - p.j0] * (ez[i][j+1] - ez[i][j]);
+			hx[i][j] = p.hxpml[i - p.i0][j - p.j0];
 		}
 	}
 
 	//! Hy
 	for (int j = p.j0+1; j <= p.j1 - 1; j++) {
 		for (int i = p.i0; i <= p.i1 - 1; i++) {
-			p.hypml[i][j] = p.amxpml[i][j] * p.hypml[i][j] + p.bmxpml[i][j] * (ez[i+1][j] - ez[i][j]);
-			hy[i][j] = p.hypml[i][j];
+			p.hypml[i - p.i0][j - p.j0] = p.amxpml[i - p.i0][j - p.j0] * p.hypml[i - p.i0][j - p.j0] + p.bmxpml[i - p.i0][j - p.j0] * (ez[i+1][j] - ez[i][j]);
+			hy[i][j] = p.hypml[i - p.i0][j - p.j0];
 		}
 	}
 
 	//! Hz
 	for (int j = p.j0; j <= p.j1 - 1; j++) {
 		for (int i = p.i0; i <= p.i1 - 1; i++) {
-			p.hzx[i][j] = p.amxpml[i][j] * p.hzx[i][j] - p.bmxpml[i][j] * (ey[i+1][j] - ey[i][j]);
-			p.hzy[i][j] = p.amypml[i][j] * p.hzy[i][j] + p.bmypml[i][j] * (ex[i][j+1] - ex[i][j]);
-			hz[i][j] = p.hzx[i][j] + p.hzy[i][j];
+			p.hzx[i - p.i0][j - p.j0] = p.amxpml[i - p.i0][j - p.j0] * p.hzx[i - p.i0][j - p.j0] - p.bmxpml[i - p.i0][j - p.j0] * (ey[i+1][j] - ey[i][j]);
+			p.hzy[i - p.i0][j - p.j0] = p.amypml[i - p.i0][j - p.j0] * p.hzy[i - p.i0][j - p.j0] + p.bmypml[i - p.i0][j - p.j0] * (ex[i][j+1] - ex[i][j]);
+			hz[i][j] = p.hzx[i - p.i0][j - p.j0] + p.hzy[i - p.i0][j - p.j0];
 		}
 	}
 
